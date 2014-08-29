@@ -1,8 +1,8 @@
 var DeviceManager = function () {
+  var noop = function () {};
+
   this.sensorDevice = null;
   this.hmdDevice = null;
-
-  var noop = function () {};
 
   function perspectiveMatrixFromVRFieldOfView(fov, zNear, zFar) {
     var outMat = new THREE.Matrix4();
@@ -65,9 +65,9 @@ var DeviceManager = function () {
       this.hmdDevice.setFieldOfView(fovLeft, fovRight);
     }
 
+    var renderTargetSize = null;
     if ('getRecommendedRenderTargetSize' in this.hmdDevice) {
-      var renderTargetSize = this.hmdDevice.getRecommendedRenderTargetSize();
-      document.getElementById("renderTarget").innerHTML = renderTargetSize.width + "x" + renderTargetSize.height;
+      renderTargetSize = this.hmdDevice.getRecommendedRenderTargetSize();
     }
 
     if ('getCurrentEyeFieldOfView' in this.hmdDevice) {
@@ -78,9 +78,12 @@ var DeviceManager = function () {
       fovRight = this.hmdDevice.getRecommendedEyeFieldOfView("right");
     }
 
-    cameraLeft.projectionMatrix = perspectiveMatrixFromVRFieldOfView(fovLeft, 0.1, 1000);
-    cameraRight.projectionMatrix = perspectiveMatrixFromVRFieldOfView(fovRight, 0.1, 1000);
-    this.onResizeFOV();
+    var leftProjectionMatrix = perspectiveMatrixFromVRFieldOfView(
+      fovLeft, 0.1, 1000);
+    var rightProjectionMatrix = perspectiveMatrixFromVRFieldOfView(
+      fovRight, 0.1, 1000);
+    this.onResizeFOV(
+      renderTargetSize, leftProjectionMatrix, rightProjectionMatrix);
   }.bind(this);
 
   this.onHMDDeviceFound = noop;
@@ -99,8 +102,13 @@ var DeviceManager = function () {
 
     // Next find a sensor that matches the HMD hardwareUnitId
     for (var i = 0; i < devices.length; ++i) {
-      if (devices[i] instanceof PositionSensorVRDevice &&
-            (!this.hmdDevice || devices[i].hardwareUnitId == this.hmdDevice.hardwareUnitId)) {
+      if (
+        devices[i] instanceof PositionSensorVRDevice &&
+        (
+          !this.hmdDevice ||
+          devices[i].hardwareUnitId == this.hmdDevice.hardwareUnitId
+        )
+      ) {
         this.sensorDevice = devices[i];
         this.onSensorDeviceFound(this.sensorDevice);
       }
