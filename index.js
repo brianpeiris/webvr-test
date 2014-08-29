@@ -16,13 +16,13 @@
 
   var deviceManager = new DeviceManager();
   deviceManager.onResizeFOV = function (
-    renderTargetSize, leftProjectionMatrix, rightProjectionMatrix
+    renderTargetSize, fovLeft, fovRight
   ) {
     if (renderTargetSize) {
       document.getElementById("renderTarget").innerHTML = (
         renderTargetSize.width + "x" + renderTargetSize.height);
     }
-    renderer.setProjectionMatrices(leftProjectionMatrix, rightProjectionMatrix);
+    renderer.setFOV(fovLeft, fovRight);
   };
 
   var renderer = new Renderer();
