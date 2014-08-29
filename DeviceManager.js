@@ -44,8 +44,7 @@ var DeviceManager = function () {
       fovRight = this.hmdDevice.getRecommendedEyeFieldOfView("right");
     }
 
-    this.onResizeFOV(
-      renderTargetSize, fovLeft, fovRight);
+    this.onResizeFOV(renderTargetSize, fovLeft, fovRight);
   }.bind(this);
 
   this.onHMDDeviceFound = noop;
