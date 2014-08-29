@@ -15,146 +15,55 @@ function printVector(values) {
   return str;
 }
 
-//
-// WebVR Device initialization
-//
-var sensorDevice = null;
-var hmdDevice = null;
+var deviceManager = new DeviceManager();
+deviceManager.onResizeFOV = function (renderTargetSize) {
+    if (renderTargetSize) {
+        document.getElementById("renderTarget").innerHTML = (
+            renderTargetSize.width + "x" + renderTargetSize.height);
+    }
+};
 var vrMode = false;
-var stats = document.getElementById("stats");
-
-function PerspectiveMatrixFromVRFieldOfView(fov, zNear, zFar) {
-  var outMat = new THREE.Matrix4();
-  var out = outMat.elements;
-  var upTan = Math.tan(fov.upDegrees * Math.PI/180.0);
-  var downTan = Math.tan(fov.downDegrees * Math.PI/180.0);
-  var leftTan = Math.tan(fov.leftDegrees * Math.PI/180.0);
-  var rightTan = Math.tan(fov.rightDegrees * Math.PI/180.0);
-
-  var xScale = 2.0 / (leftTan + rightTan);
-  var yScale = 2.0 / (upTan + downTan);
-
-  out[0] = xScale;
-  out[4] = 0.0;
-  out[8] = -((leftTan - rightTan) * xScale * 0.5);
-  out[12] = 0.0;
-
-  out[1] = 0.0;
-  out[5] = yScale;
-  out[9] = ((upTan - downTan) * yScale * 0.5);
-  out[13] = 0.0;
-
-  out[2] = 0.0;
-  out[6] = 0.0;
-  out[10] = zFar / (zNear - zFar);
-  out[14] = (zFar * zNear) / (zNear - zFar);
-
-  out[3] = 0.0;
-  out[7] = 0.0;
-  out[11] = -1.0;
-  out[15] = 0.0;
-
-  return outMat;
-}
 
 var cameraLeft = new THREE.PerspectiveCamera( 75, 4/3, 0.1, 1000 );
 var cameraRight = new THREE.PerspectiveCamera( 75, 4/3, 0.1, 1000 );
 
-var fovScale = 1.0;
-function resizeFOV(amount) {
-  var fovLeft, fovRight;
+deviceManager.onHMDDeviceFound = function (hmdDevice) {
+  var eyeOffsetLeft = hmdDevice.getEyeTranslation("left");
+  var eyeOffsetRight = hmdDevice.getEyeTranslation("right")
 
-  if (!hmdDevice) { return; }
+  document.getElementById("leftTranslation").innerHTML = printVector(eyeOffsetLeft);
+  document.getElementById("rightTranslation").innerHTML = printVector(eyeOffsetRight);
 
-  if (amount != 0 && 'setFieldOfView' in hmdDevice) {
-    fovScale += amount;
-    if (fovScale < 0.1) { fovScale = 0.1; }
+  cameraLeft.position.sub(eyeOffsetLeft);
+  cameraLeft.position.z = 12;
 
-    fovLeft = hmdDevice.getRecommendedEyeFieldOfView("left");
-    fovRight = hmdDevice.getRecommendedEyeFieldOfView("right");
+  cameraRight.position.sub(eyeOffsetRight);
+  cameraRight.position.z = 12;
+};
 
-    fovLeft.upDegrees *= fovScale;
-    fovLeft.downDegrees *= fovScale;
-    fovLeft.leftDegrees *= fovScale;
-    fovLeft.rightDegrees *= fovScale;
+deviceManager.onSensorDeviceFound = function (sensorDevice) {
+  document.getElementById("hardwareUnitId").innerHTML = sensorDevice.hardwareUnitId;
+  document.getElementById("deviceId").innerHTML = sensorDevice.deviceId;
+  document.getElementById("deviceName").innerHTML = sensorDevice.deviceName;
+};
 
-    fovRight.upDegrees *= fovScale;
-    fovRight.downDegrees *= fovScale;
-    fovRight.leftDegrees *= fovScale;
-    fovRight.rightDegrees *= fovScale;
-
-    hmdDevice.setFieldOfView(fovLeft, fovRight);
-  }
-
-  if ('getRecommendedRenderTargetSize' in hmdDevice) {
-    var renderTargetSize = hmdDevice.getRecommendedRenderTargetSize();
-    document.getElementById("renderTarget").innerHTML = renderTargetSize.width + "x" + renderTargetSize.height;
-  }
-
-  if ('getCurrentEyeFieldOfView' in hmdDevice) {
-    fovLeft = hmdDevice.getCurrentEyeFieldOfView("left");
-    fovRight = hmdDevice.getCurrentEyeFieldOfView("right");
-  } else {
-    fovLeft = hmdDevice.getRecommendedEyeFieldOfView("left");
-    fovRight = hmdDevice.getRecommendedEyeFieldOfView("right");
-  }
-
-  cameraLeft.projectionMatrix = PerspectiveMatrixFromVRFieldOfView(fovLeft, 0.1, 1000);
-  cameraRight.projectionMatrix = PerspectiveMatrixFromVRFieldOfView(fovRight, 0.1, 1000);
-}
-
-function EnumerateVRDevices(devices) {
-  // First find an HMD device
-  for (var i = 0; i < devices.length; ++i) {
-    if (devices[i] instanceof HMDVRDevice) {
-      hmdDevice = devices[i];
-
-      var eyeOffsetLeft = hmdDevice.getEyeTranslation("left");
-      var eyeOffsetRight = hmdDevice.getEyeTranslation("right")
-      document.getElementById("leftTranslation").innerHTML = printVector(eyeOffsetLeft);
-      document.getElementById("rightTranslation").innerHTML = printVector(eyeOffsetRight);
-
-      cameraLeft.position.sub(eyeOffsetLeft);
-      cameraLeft.position.z = 12;
-
-      cameraRight.position.sub(eyeOffsetRight);
-      cameraRight.position.z = 12;
-
-      resizeFOV(0.0);
-    }
-  }
-
-  // Next find a sensor that matches the HMD hardwareUnitId
-  for (var i = 0; i < devices.length; ++i) {
-    if (devices[i] instanceof PositionSensorVRDevice &&
-          (!hmdDevice || devices[i].hardwareUnitId == hmdDevice.hardwareUnitId)) {
-      sensorDevice = devices[i];
-      document.getElementById("hardwareUnitId").innerHTML = sensorDevice.hardwareUnitId;
-      document.getElementById("deviceId").innerHTML = sensorDevice.deviceId;
-      document.getElementById("deviceName").innerHTML = sensorDevice.deviceName;
-    }
-  }
-}
-
-if (navigator.getVRDevices) {
-  navigator.getVRDevices().then(EnumerateVRDevices);
-} else if (navigator.mozGetVRDevices) {
-  navigator.mozGetVRDevices(EnumerateVRDevices);
-} else {
+var stats = document.getElementById("stats");
+deviceManager.onError = function () {
   stats.classList.add("error");
   stats.innerHTML = "WebVR API not supported";
 }
+deviceManager.init();
 
 window.addEventListener("keydown", function(ev) {
-  if (hmdDevice) {
+  if (deviceManager.hmdDevice) {
     if (ev.keyCode == "R".charCodeAt(0))  {
-      sensorDevice.resetSensor();
+      deviceManager.sensorDevice.resetSensor();
     }
     if (ev.keyCode == 187 || ev.keyCode == 61)  { // "+" key
-      resizeFOV(0.1);
+      deviceManager.deviceManager.resizeFOV(0.1);
     }
     if (ev.keyCode == 189 || ev.keyCode == 173)  { // "-" key
-      resizeFOV(-0.1);
+      deviceManager.deviceManager.resizeFOV(-0.1);
     }
   }
 });
@@ -233,9 +142,11 @@ if (vrBtn) {
   vrBtn.addEventListener("click", function() {
     vrMode = true;
     if (renderer.domElement.webkitRequestFullscreen) {
-      renderer.domElement.webkitRequestFullscreen({ vrDisplay: hmdDevice });
+      renderer.domElement.webkitRequestFullscreen({
+        vrDisplay: deviceManager.hmdDevice });
     } else if (renderer.domElement.mozRequestFullScreen) {
-      renderer.domElement.mozRequestFullScreen({ vrDisplay: hmdDevice });
+      renderer.domElement.mozRequestFullScreen({
+        vrDisplay: deviceManager.hmdDevice });
     }
   }, false);
 }
@@ -253,8 +164,8 @@ var angularAcceleration = document.getElementById("angularAcceleration");
 var linearAcceleration = document.getElementById("linearAcceleration");
 
 function updateVRDevice() {
-  if (!sensorDevice) return false;
-  var vrState = sensorDevice.getState();
+  if (!deviceManager.sensorDevice) return false;
+  var vrState = deviceManager.sensorDevice.getState();
 
   timestamp.innerHTML = vrState.timeStamp.toFixed(2);
   orientation.innerHTML = printVector(vrState.orientation);
